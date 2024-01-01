@@ -1,4 +1,8 @@
 #include "systemcalls.h"
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -9,15 +13,19 @@
 */
 bool do_system(const char *cmd)
 {
-
+bool bret = true;
 /*
  * TODO  add your code here
  *  Call the system() function with the command set in the cmd
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
+int ret = system(cmd);
+if(ret !=0){
+    bret = false;
+}
 
-    return true;
+    return bret;
 }
 
 /**
@@ -34,34 +42,49 @@ bool do_system(const char *cmd)
 *   by the command issued in @param arguments with the specified arguments.
 */
 
-bool do_exec(int count, ...)
-{
-    va_list args;
-    va_start(args, count);
-    char * command[count+1];
-    int i;
-    for(i=0; i<count; i++)
-    {
-        command[i] = va_arg(args, char *);
+bool do_exec(int count, ...) {
+  va_list args;
+  va_start(args, count);
+  char *command[count + 1];
+  int i;
+  for (i = 0; i < count; i++) {
+    command[i] = va_arg(args, char *);
+  }
+  command[count] = NULL;
+  // this line is to avoid a compile warning before your implementation is
+  // complete and may be removed
+  command[count] = command[count];
+
+  /*
+   * TODO:
+   *   Execute a system command by calling fork, execv(),
+   *   and wait instead of system (see LSP page 161).
+   *   Use the command[0] as the full path to the command to execute
+   *   (first argument to execv), and use the remaining arguments
+   *   as second argument to the execv() command.
+   *
+   */
+  int pid = fork();
+  if (pid == -1)
+    return false;
+  else if (pid == 0) {
+    execv(command[0], command);
+    printf("execv failed in child ===== exit with -1\n");
+    exit(1);
+  }
+  int status;
+  printf("parent going to wait=====\n");
+  if (waitpid(pid, &status, 0) == -1){
+  printf("parent returning false after wait=====\n");
+    return false;}
+  else if (((status & 0x100)>>8)==1){
+  printf("captured status 1 in parent, return false\n");
+    return false;
     }
-    command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
-
-/*
- * TODO:
- *   Execute a system command by calling fork, execv(),
- *   and wait instead of system (see LSP page 161).
- *   Use the command[0] as the full path to the command to execute
- *   (first argument to execv), and use the remaining arguments
- *   as second argument to the execv() command.
- *
-*/
-
-    va_end(args);
-
-    return true;
+    printf("status = %d\n",status);
+  va_end(args);
+    printf("returning true=====\n");
+  return true;
 }
 
 /**
@@ -92,7 +115,31 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
-
+int kidpid;
+int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+if (fd < 0) { perror("open"); abort(); }
+switch (kidpid = fork()) {
+  case -1: perror("fork"); abort();
+  case 0:
+    if (dup2(fd, 1) < 0) { perror("dup2"); abort(); }
+    close(fd);
+    execv(command[0], command);
+    exit(1);
+    perror("execvp"); abort();
+  default:
+    close(fd);
+    /* do whatever the parent wants to do. */
+}
+int status;
+  printf("parent going to wait=====\n");
+  if (waitpid(kidpid, &status, 0) == -1){
+  printf("parent returning false after wait=====\n");
+    return false;}
+  else if (((status & 0x100)>>8)==1){
+  printf("captured status 1 in parent, return false\n");
+    return false;
+    }
+    printf("status = %d\n",status);
     va_end(args);
 
     return true;
