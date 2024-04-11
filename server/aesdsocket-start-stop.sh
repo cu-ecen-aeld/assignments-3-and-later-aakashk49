@@ -6,7 +6,7 @@ case "$1" in
  ;;
  stop)
  echo "Stopping aesdsocket"
- start-stop-daemon -K -n simpleserver
+ start-stop-daemon -K -n aesdsocket
  ;;
  *)
  echo "Usage: $0 {start|stop}"
